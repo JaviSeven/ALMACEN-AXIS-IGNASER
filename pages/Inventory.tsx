@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { StockItem, User } from '../types';
-import { Search, Trash2, MapPin, MapPinned, ArrowDownCircle, X, Check } from 'lucide-react';
+import { Search, Trash2, MapPin, MapPinned, ArrowDownCircle, X, Check, Eye } from 'lucide-react';
 
 interface InventoryProps {
   items: StockItem[];
@@ -15,6 +15,7 @@ const Inventory: React.FC<InventoryProps> = ({ items, onMaterialOut, onDelete, c
   const [salidaModal, setSalidaModal] = useState<{ item: StockItem } | null>(null);
   const [salidaObra, setSalidaObra] = useState('');
   const [salidaUnidades, setSalidaUnidades] = useState(1);
+  const [previewItem, setPreviewItem] = useState<StockItem | null>(null);
 
   const openSalidaModal = (item: StockItem) => {
     setSalidaModal({ item });
@@ -57,8 +58,14 @@ const Inventory: React.FC<InventoryProps> = ({ items, onMaterialOut, onDelete, c
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredItems.map(item => (
-          <div key={item.id} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm group hover:shadow-md transition-shadow">
-            <div className="relative h-48 bg-slate-100 overflow-hidden">
+          <div
+            key={item.id}
+            className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm group hover:shadow-md transition-shadow"
+          >
+            <div
+              className="relative h-48 bg-slate-100 overflow-hidden cursor-pointer"
+              onClick={() => setPreviewItem(item)}
+            >
               {item.imageUrl ? (
                 <img 
                   src={item.imageUrl} 
@@ -69,7 +76,8 @@ const Inventory: React.FC<InventoryProps> = ({ items, onMaterialOut, onDelete, c
               <div className="absolute top-2 right-2">
                 {currentUser.role === 'Admin' && (
                   <button 
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation();
                       if(confirm('¿Estás seguro de que deseas eliminar este artículo?')) {
                         onDelete(item.id);
                       }
@@ -85,10 +93,10 @@ const Inventory: React.FC<InventoryProps> = ({ items, onMaterialOut, onDelete, c
               </div>
             </div>
 
-            <div className="p-5">
+            <div className="p-5 cursor-pointer" onClick={() => setPreviewItem(item)}>
               <div className="flex justify-between items-start gap-2">
-                <h4 className="font-bold text-slate-800 text-lg truncate flex-1">{item.concept}</h4>
-                <span className="text-[10px] text-slate-400 font-mono mt-1">ID: {item.id.slice(0, 5)}</span>
+                <h4 className="font-bold text-slate-800 text-base line-clamp-3 flex-1 leading-snug">{item.concept}</h4>
+                <span className="text-[10px] text-slate-400 font-mono mt-1 shrink-0">ID: {item.id.slice(0, 5)}</span>
               </div>
               <p className="text-slate-500 text-sm mt-1 line-clamp-2 min-h-[40px]">{item.description}</p>
               {item.location && (
@@ -97,7 +105,7 @@ const Inventory: React.FC<InventoryProps> = ({ items, onMaterialOut, onDelete, c
                   <span className="truncate">{item.location}</span>
                 </p>
               )}
-              <div className="mt-6 flex items-center justify-between border-t border-slate-100 pt-4">
+              <div className="mt-6 flex items-center justify-between border-t border-slate-100 pt-4" onClick={e => e.stopPropagation()}>
                 <div className="flex flex-col">
                   <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Stock Almacenado</span>
                   <span className="text-2xl font-black text-slate-800">
@@ -127,6 +135,61 @@ const Inventory: React.FC<InventoryProps> = ({ items, onMaterialOut, onDelete, c
           </div>
         )}
       </div>
+
+      {/* Modal Vista previa producto */}
+      {previewItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setPreviewItem(null)}>
+          <div
+            className="bg-white rounded-2xl shadow-xl max-w-lg w-full overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="relative h-56 bg-slate-100">
+              {previewItem.imageUrl ? (
+                <img src={previewItem.imageUrl} className="w-full h-full object-cover" alt={previewItem.concept} />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-slate-400">
+                  <Eye size={48} />
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => setPreviewItem(null)}
+                className="absolute top-3 right-3 p-2 bg-white/90 rounded-lg hover:bg-white"
+              >
+                <X size={20} className="text-slate-600" />
+              </button>
+            </div>
+            <div className="p-6">
+              <h3 className="text-xl font-bold text-slate-800 leading-snug">{previewItem.concept}</h3>
+              <p className="text-xs text-slate-400 font-mono mt-1">ID: {previewItem.id}</p>
+              <p className="text-slate-600 text-sm mt-3 whitespace-pre-wrap">{previewItem.description}</p>
+              <div className="mt-4 flex flex-wrap gap-3 text-sm">
+                <span className="flex items-center gap-1 text-slate-600">
+                  <MapPin size={14} className="text-blue-600" /> {previewItem.obra}
+                </span>
+                {previewItem.location && (
+                  <span className="flex items-center gap-1 text-slate-600">
+                    <MapPinned size={14} className="text-slate-500" /> {previewItem.location}
+                  </span>
+                )}
+              </div>
+              <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between">
+                <span className="text-slate-500 text-sm">Stock:</span>
+                <span className="text-2xl font-black text-slate-800">{previewItem.quantity} uds.</span>
+              </div>
+              {currentUser.role !== 'SoloLectura' && previewItem.quantity > 0 && (
+                <button
+                  type="button"
+                  onClick={() => { setPreviewItem(null); openSalidaModal(previewItem); }}
+                  className="mt-4 w-full flex items-center justify-center gap-2 py-3 bg-rose-50 text-rose-700 rounded-xl font-semibold hover:bg-rose-100"
+                >
+                  <ArrowDownCircle size={18} /> Salida de material
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal Salida de material */}
       {salidaModal && (
