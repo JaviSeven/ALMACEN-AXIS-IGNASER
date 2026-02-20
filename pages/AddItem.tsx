@@ -1,8 +1,23 @@
 
 import React, { useState, useRef } from 'react';
-import { Camera, Save, X, MapPin, Package, MapPinned, Lock } from 'lucide-react';
+import { Camera, Save, X, MapPin, Package, MapPinned, Lock, FileSpreadsheet, Download, Upload } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import * as XLSX from 'xlsx';
 import { User } from '../types';
+
+const PLANTILLA_COLUMNAS = ['Concepto', 'Obra', 'Descripción', 'Cantidad', 'Ubicación'] as const;
+
+function descargarPlantilla() {
+  const wb = XLSX.utils.book_new();
+  const datos = [
+    PLANTILLA_COLUMNAS,
+    ['Bobina cobre 2.5 mm', 'C.C. La Maquinista', 'En buen estado', 10, 'Estantería A3'],
+    ['Cable flexible 3G1.5', 'Obra Ejemplo', 'Nuevo a estrenar', 5, 'Pasillo 2']
+  ];
+  const ws = XLSX.utils.aoa_to_sheet(datos);
+  XLSX.utils.book_append_sheet(wb, ws, 'Materiales');
+  XLSX.writeFile(wb, 'plantilla_entrada_material.xlsx');
+}
 
 interface AddItemProps {
   onAdd: (item: { concept: string; obra: string; description: string; imageUrl: string; quantity: number; location: string }) => void | Promise<void>;
@@ -38,6 +53,9 @@ const AddItem: React.FC<AddItemProps> = ({ onAdd, currentUser }) => {
   const [quantity, setQuantity] = useState<number>(1);
   const [location, setLocation] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const excelInputRef = useRef<HTMLInputElement>(null);
+  const [importando, setImportando] = useState(false);
+  const [importResult, setImportResult] = useState<{ ok: number; errores: string[] } | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -66,13 +84,113 @@ const AddItem: React.FC<AddItemProps> = ({ onAdd, currentUser }) => {
     navigate('/inventory');
   };
 
+  const handleExcelImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setImportResult(null);
+    setImportando(true);
+    const errores: string[] = [];
+    let ok = 0;
+    try {
+      const data = await file.arrayBuffer();
+      const wb = XLSX.read(data, { type: 'array' });
+      const firstSheet = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json<string[]>(firstSheet, { header: 1 }) as unknown[][];
+      if (rows.length < 2) {
+        setImportResult({ ok: 0, errores: ['El archivo no tiene filas de datos (mínimo cabecera + 1 fila).'] });
+        setImportando(false);
+        return;
+      }
+      const header = (rows[0] as string[]).map(h => (h || '').toString().trim());
+      const idx = (name: string) => {
+        const i = header.findIndex(h => h.toLowerCase() === name.toLowerCase());
+        return i >= 0 ? i : -1;
+      };
+      const iConcepto = idx('Concepto');
+      const iObra = idx('Obra');
+      const iDesc = idx('Descripción');
+      const iCant = idx('Cantidad');
+      const iUbi = idx('Ubicación');
+      if (iConcepto < 0 || iObra < 0 || iDesc < 0 || iCant < 0 || iUbi < 0) {
+        setImportResult({ ok: 0, errores: ['Faltan columnas. La plantilla debe tener: Concepto, Obra, Descripción, Cantidad, Ubicación.'] });
+        setImportando(false);
+        return;
+      }
+      for (let r = 1; r < rows.length; r++) {
+        const row = rows[r] as unknown[];
+        if (!row || row.length === 0) continue;
+        const concept = (row[iConcepto] ?? '').toString().trim();
+        const obra = (row[iObra] ?? '').toString().trim();
+        const description = (row[iDesc] ?? '').toString().trim();
+        const quantity = Math.max(1, parseInt(String(row[iCant]), 10) || 1);
+        const location = (row[iUbi] ?? '').toString().trim();
+        if (!concept || !obra || !description || !location) {
+          errores.push(`Fila ${r + 1}: faltan datos.`);
+          continue;
+        }
+        try {
+          await onAdd({ concept, obra, description, imageUrl: '', quantity, location });
+          ok++;
+        } catch (err) {
+          errores.push(`Fila ${r + 1}: ${err instanceof Error ? err.message : 'Error al guardar'}.`);
+        }
+      }
+      setImportResult({ ok, errores });
+      if (ok > 0) setTimeout(() => navigate('/inventory'), 2000);
+    } catch (err) {
+      setImportResult({ ok: 0, errores: [err instanceof Error ? err.message : 'Error al leer el Excel.'] });
+    }
+    setImportando(false);
+  };
+
   return (
     <div className="max-w-2xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12">
       <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
         <div className="p-8">
           <h2 className="text-2xl font-bold text-slate-800 mb-2">Dar entrada a material</h2>
-          <p className="text-slate-500 mb-8 text-sm">Completa los datos del material e indica las unidades y la ubicación en el almacén.</p>
-          
+          <p className="text-slate-500 mb-6 text-sm">Completa los datos del material e indica las unidades y la ubicación en el almacén.</p>
+
+          {/* Importar desde Excel */}
+          <div className="mb-8 p-4 rounded-xl bg-slate-50 border border-slate-200">
+            <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+              <FileSpreadsheet size={18} className="text-emerald-600" /> Importar desde Excel
+            </h3>
+            <p className="text-xs text-slate-500 mb-3">Descarga la plantilla, rellena las filas y súbela para dar entrada a varios materiales a la vez (sin foto).</p>
+            <div className="flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={descargarPlantilla}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                <Download size={16} /> Descargar plantilla
+              </button>
+              <label className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 cursor-pointer">
+                <Upload size={16} />
+                {importando ? 'Importando...' : 'Seleccionar Excel'}
+                <input
+                  ref={excelInputRef}
+                  type="file"
+                  accept=".xlsx,.xls"
+                  className="hidden"
+                  onChange={handleExcelImport}
+                  disabled={importando}
+                />
+              </label>
+            </div>
+            {importResult && (
+              <div className={`mt-3 text-sm p-3 rounded-lg ${importResult.ok > 0 ? 'bg-emerald-50 text-emerald-800' : 'bg-rose-50 text-rose-800'}`}>
+                {importResult.ok > 0 && <p className="font-medium">Se han importado {importResult.ok} material(es). Redirigiendo al inventario...</p>}
+                {importResult.errores.length > 0 && (
+                  <ul className="list-disc list-inside mt-1">
+                    {importResult.errores.slice(0, 5).map((e, i) => <li key={i}>{e}</li>)}
+                    {importResult.errores.length > 5 && <li>... y {importResult.errores.length - 5} más</li>}
+                  </ul>
+                )}
+              </div>
+            )}
+          </div>
+
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
