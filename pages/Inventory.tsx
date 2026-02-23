@@ -13,6 +13,7 @@ interface InventoryProps {
 
 const Inventory: React.FC<InventoryProps> = ({ items, onMaterialOut, onDelete, onUpdateItem, currentUser }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterCategory, setFilterCategory] = useState<string>('');
   const [salidaModal, setSalidaModal] = useState<{ item: StockItem } | null>(null);
   const [salidaObra, setSalidaObra] = useState('');
   const [salidaUnidades, setSalidaUnidades] = useState(1);
@@ -55,24 +56,42 @@ const Inventory: React.FC<InventoryProps> = ({ items, onMaterialOut, onDelete, o
     closeSalidaModal();
   };
 
-  const filteredItems = items.filter(item => 
-    item.concept.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.obra.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (item.category && item.category.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const filteredItems = items.filter(item => {
+    const matchSearch = !searchTerm.trim() ||
+      item.concept.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.obra.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (item.category && item.category.toLowerCase().includes(searchTerm.toLowerCase()));
+    const matchCategory = !filterCategory || (item.category === filterCategory);
+    return matchSearch && matchCategory;
+  });
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="relative">
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
-        <input
-          type="text"
-          placeholder="Buscar por concepto, obra, categoría o descripción..."
-          className="w-full pl-12 pr-4 py-4 bg-white rounded-2xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all shadow-sm"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
+      <div className="space-y-3">
+        <div className="relative">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+          <input
+            type="text"
+            placeholder="Buscar por concepto, obra, categoría o descripción..."
+            className="w-full pl-12 pr-4 py-4 bg-white rounded-2xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all shadow-sm"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-semibold text-slate-700 mb-1.5">Filtrar por categoría</label>
+          <select
+            value={filterCategory}
+            onChange={(e) => setFilterCategory(e.target.value)}
+            className="w-full md:w-auto min-w-[200px] px-4 py-3 bg-white rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700"
+          >
+            <option value="">Todas las categorías</option>
+            {CATEGORIAS.map((cat) => (
+              <option key={cat} value={cat}>{cat}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

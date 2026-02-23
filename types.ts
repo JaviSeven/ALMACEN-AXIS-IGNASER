@@ -18,7 +18,8 @@ export const CATEGORIAS = [
   'MOLDURAS',
   'PERFILERIA',
   'SANITARIOS',
-  'SUELO Y TECHOS'
+  'SUELOS',
+  'TECHOS'
 ] as const;
 
 export type Categoria = typeof CATEGORIAS[number];
