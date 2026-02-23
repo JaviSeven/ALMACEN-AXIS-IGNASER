@@ -1,21 +1,33 @@
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { StockItem, User } from '../types';
-import { Search, Trash2, MapPin, MapPinned, ArrowDownCircle, X, Check, Eye } from 'lucide-react';
+import { Search, Trash2, MapPin, MapPinned, ArrowDownCircle, X, Check, Eye, Camera, Save } from 'lucide-react';
 
 interface InventoryProps {
   items: StockItem[];
   onMaterialOut: (itemId: string, amount: number, obraDestino: string) => void;
   onDelete: (id: string) => void;
+  onUpdateItem: (itemId: string, updates: { description?: string; imageUrl?: string }) => void | Promise<void>;
   currentUser: User;
 }
 
-const Inventory: React.FC<InventoryProps> = ({ items, onMaterialOut, onDelete, currentUser }) => {
+const Inventory: React.FC<InventoryProps> = ({ items, onMaterialOut, onDelete, onUpdateItem, currentUser }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [salidaModal, setSalidaModal] = useState<{ item: StockItem } | null>(null);
   const [salidaObra, setSalidaObra] = useState('');
   const [salidaUnidades, setSalidaUnidades] = useState(1);
   const [previewItem, setPreviewItem] = useState<StockItem | null>(null);
+  const [editDescription, setEditDescription] = useState('');
+  const [editImageUrl, setEditImageUrl] = useState('');
+  const [guardando, setGuardando] = useState(false);
+  const previewPhotoInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (previewItem) {
+      setEditDescription(previewItem.description);
+      setEditImageUrl(previewItem.imageUrl || '');
+    }
+  }, [previewItem]);
 
   const openSalidaModal = (item: StockItem) => {
     setSalidaModal({ item });
@@ -138,19 +150,54 @@ const Inventory: React.FC<InventoryProps> = ({ items, onMaterialOut, onDelete, c
 
       {/* Modal Vista previa producto */}
       {previewItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setPreviewItem(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 overflow-y-auto py-8" onClick={() => setPreviewItem(null)}>
           <div
-            className="bg-white rounded-2xl shadow-xl max-w-lg w-full overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+            className="bg-white rounded-2xl shadow-xl max-w-lg w-full overflow-hidden animate-in fade-in zoom-in-95 duration-200 my-auto"
             onClick={e => e.stopPropagation()}
           >
             <div className="relative h-56 bg-slate-100">
-              {previewItem.imageUrl ? (
-                <img src={previewItem.imageUrl} className="w-full h-full object-cover" alt={previewItem.concept} />
+              {currentUser.role !== 'SoloLectura' ? (
+                <div
+                  className="w-full h-full flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 transition-colors relative group"
+                  onClick={() => previewPhotoInputRef.current?.click()}
+                >
+                  {editImageUrl ? (
+                    <>
+                      <img src={editImageUrl} className="w-full h-full object-cover" alt={previewItem.concept} />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                        <Camera className="text-white" size={40} />
+                        <span className="text-white text-sm font-medium ml-2">Cambiar foto</span>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <Camera className="text-slate-400 mb-2" size={48} />
+                      <span className="text-slate-500 text-sm">Click para añadir foto</span>
+                    </>
+                  )}
+                </div>
+              ) : editImageUrl ? (
+                <img src={editImageUrl} className="w-full h-full object-cover" alt={previewItem.concept} />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-slate-400">
                   <Eye size={48} />
                 </div>
               )}
+              <input
+                ref={previewPhotoInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    const reader = new FileReader();
+                    reader.onloadend = () => setEditImageUrl(reader.result as string);
+                    reader.readAsDataURL(file);
+                  }
+                  e.target.value = '';
+                }}
+              />
               <button
                 type="button"
                 onClick={() => setPreviewItem(null)}
@@ -162,7 +209,22 @@ const Inventory: React.FC<InventoryProps> = ({ items, onMaterialOut, onDelete, c
             <div className="p-6">
               <h3 className="text-xl font-bold text-slate-800 leading-snug">{previewItem.concept}</h3>
               <p className="text-xs text-slate-400 font-mono mt-1">ID: {previewItem.id}</p>
-              <p className="text-slate-600 text-sm mt-3 whitespace-pre-wrap">{previewItem.description}</p>
+
+              {currentUser.role !== 'SoloLectura' ? (
+                <>
+                  <label className="block text-sm font-semibold text-slate-700 mt-4 mb-1">Descripción</label>
+                  <textarea
+                    value={editDescription}
+                    onChange={(e) => setEditDescription(e.target.value)}
+                    rows={4}
+                    className="w-full px-4 py-3 bg-slate-50 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none text-slate-700"
+                    placeholder="Descripción del material..."
+                  />
+                </>
+              ) : (
+                <p className="text-slate-600 text-sm mt-3 whitespace-pre-wrap">{previewItem.description}</p>
+              )}
+
               <div className="mt-4 flex flex-wrap gap-3 text-sm">
                 <span className="flex items-center gap-1 text-slate-600">
                   <MapPin size={14} className="text-blue-600" /> {previewItem.obra}
@@ -177,14 +239,35 @@ const Inventory: React.FC<InventoryProps> = ({ items, onMaterialOut, onDelete, c
                 <span className="text-slate-500 text-sm">Stock:</span>
                 <span className="text-2xl font-black text-slate-800">{previewItem.quantity} uds.</span>
               </div>
-              {currentUser.role !== 'SoloLectura' && previewItem.quantity > 0 && (
-                <button
-                  type="button"
-                  onClick={() => { setPreviewItem(null); openSalidaModal(previewItem); }}
-                  className="mt-4 w-full flex items-center justify-center gap-2 py-3 bg-rose-50 text-rose-700 rounded-xl font-semibold hover:bg-rose-100"
-                >
-                  <ArrowDownCircle size={18} /> Salida de material
-                </button>
+
+              {currentUser.role !== 'SoloLectura' && (
+                <div className="mt-4 flex gap-3">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setGuardando(true);
+                      await onUpdateItem(previewItem.id, { description: editDescription, imageUrl: editImageUrl || undefined });
+                      setPreviewItem(prev => prev ? { ...prev, description: editDescription, imageUrl: editImageUrl } : null);
+                      setGuardando(false);
+                    }}
+                    disabled={guardando}
+                    className="flex-1 flex items-center justify-center gap-2 py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    <Save size={18} /> {guardando ? 'Guardando...' : 'Guardar cambios'}
+                  </button>
+                  {previewItem.quantity > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => { setPreviewItem(null); openSalidaModal(previewItem); }}
+                      className="flex items-center justify-center gap-2 px-4 py-3 bg-rose-50 text-rose-700 rounded-xl font-semibold hover:bg-rose-100"
+                    >
+                      <ArrowDownCircle size={18} /> Salida
+                    </button>
+                  )}
+                </div>
+              )}
+              {currentUser.role === 'SoloLectura' && previewItem.quantity > 0 && (
+                <p className="mt-4 text-xs text-slate-400">Solo lectura: no puedes editar ni dar salida.</p>
               )}
             </div>
           </div>

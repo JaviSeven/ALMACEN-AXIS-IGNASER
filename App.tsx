@@ -308,6 +308,22 @@ const App: React.FC = () => {
     setItems(prev => prev.filter(i => i.id !== itemId));
   };
 
+  const updateItem = async (itemId: string, updates: { description?: string; imageUrl?: string }) => {
+    if (!currentUser || currentUser.role === 'SoloLectura') return;
+    const now = Date.now();
+    const payload: Record<string, unknown> = { updated_at: now };
+    if (updates.description !== undefined) payload.description = updates.description;
+    if (updates.imageUrl !== undefined) payload.image_url = updates.imageUrl;
+    const { error } = await supabase.from('items').update(payload).eq('id', itemId);
+    if (error) {
+      console.error('Error actualizando item:', error);
+      return;
+    }
+    setItems(prev => prev.map(i =>
+      i.id === itemId ? { ...i, ...updates, updatedAt: now } : i
+    ));
+  };
+
   const movementTypeLabel = (type: string) => {
     switch (type) {
       case 'IN': return 'Entrada';
@@ -533,6 +549,7 @@ const App: React.FC = () => {
                   items={items} 
                   onMaterialOut={handleMaterialOut}
                   onDelete={deleteItem}
+                  onUpdateItem={updateItem}
                   currentUser={currentUser}
                 />
               } />
