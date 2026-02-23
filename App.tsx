@@ -71,6 +71,7 @@ const App: React.FC = () => {
           quantity: Number(row.quantity),
           location: (row.location as string) || undefined,
           imageUrl: (row.image_url as string) ?? '',
+          category: (row.category as string) || undefined,
           createdAt: Number(row.created_at),
           updatedAt: Number(row.updated_at)
         })));
@@ -144,6 +145,7 @@ const App: React.FC = () => {
       quantity: item.quantity,
       location: item.location ?? null,
       image_url: item.imageUrl ?? '',
+      category: item.category ?? '',
       created_at: now,
       updated_at: now
     });
@@ -308,12 +310,15 @@ const App: React.FC = () => {
     setItems(prev => prev.filter(i => i.id !== itemId));
   };
 
-  const updateItem = async (itemId: string, updates: { description?: string; imageUrl?: string }) => {
+  const updateItem = async (itemId: string, updates: { description?: string; imageUrl?: string; concept?: string; obra?: string; category?: string }) => {
     if (!currentUser || currentUser.role === 'SoloLectura') return;
     const now = Date.now();
     const payload: Record<string, unknown> = { updated_at: now };
     if (updates.description !== undefined) payload.description = updates.description;
     if (updates.imageUrl !== undefined) payload.image_url = updates.imageUrl;
+    if (updates.concept !== undefined) payload.concept = updates.concept;
+    if (updates.obra !== undefined) payload.obra = updates.obra;
+    if (updates.category !== undefined) payload.category = updates.category;
     const { error } = await supabase.from('items').update(payload).eq('id', itemId);
     if (error) {
       console.error('Error actualizando item:', error);

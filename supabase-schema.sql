@@ -9,6 +9,7 @@ create table if not exists public.items (
   quantity integer not null default 0,
   location text,
   image_url text default '',
+  category text default '',
   created_at bigint not null,
   updated_at bigint not null
 );

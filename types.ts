@@ -9,6 +9,20 @@ export interface User {
 }
 
 
+export const CATEGORIAS = [
+  'CONSTRUCCION',
+  'ELECTRODOMESTICOS',
+  'ILUMINARIA',
+  'JARDINERIA',
+  'MOBILIARIO',
+  'MOLDURAS',
+  'PERFILERIA',
+  'SANITARIOS',
+  'SUELO Y TECHOS'
+] as const;
+
+export type Categoria = typeof CATEGORIAS[number];
+
 export interface StockItem {
   id: string;
   concept: string;
@@ -17,6 +31,7 @@ export interface StockItem {
   quantity: number;
   location?: string; // Ubicación dentro del almacén
   imageUrl: string;
+  category?: string; // Categoría del producto
   createdAt: number;
   updatedAt: number;
 }

@@ -3,16 +3,16 @@ import React, { useState, useRef } from 'react';
 import { Camera, Save, X, MapPin, Package, MapPinned, Lock, FileSpreadsheet, Download, Upload } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
-import { User } from '../types';
+import { User, CATEGORIAS } from '../types';
 
-const PLANTILLA_COLUMNAS = ['Concepto', 'Obra', 'Descripción', 'Cantidad', 'Ubicación'] as const;
+const PLANTILLA_COLUMNAS = ['Concepto', 'Obra', 'Categoría', 'Descripción', 'Cantidad', 'Ubicación'] as const;
 
 function descargarPlantilla() {
   const wb = XLSX.utils.book_new();
   const datos = [
     PLANTILLA_COLUMNAS,
-    ['Bobina cobre 2.5 mm', 'C.C. La Maquinista', 'En buen estado', 10, 'Estantería A3'],
-    ['Cable flexible 3G1.5', 'Obra Ejemplo', 'Nuevo a estrenar', 5, 'Pasillo 2']
+    ['Bobina cobre 2.5 mm', 'C.C. La Maquinista', 'ELECTRODOMESTICOS', 'En buen estado', 10, 'Estantería A3'],
+    ['Cable flexible 3G1.5', 'Obra Ejemplo', 'CONSTRUCCION', 'Nuevo a estrenar', 5, 'Pasillo 2']
   ];
   const ws = XLSX.utils.aoa_to_sheet(datos);
   XLSX.utils.book_append_sheet(wb, ws, 'Materiales');
@@ -20,7 +20,7 @@ function descargarPlantilla() {
 }
 
 interface AddItemProps {
-  onAdd: (item: { concept: string; obra: string; description: string; imageUrl: string; quantity: number; location: string }) => void | Promise<void>;
+  onAdd: (item: { concept: string; obra: string; category: string; description: string; imageUrl: string; quantity: number; location: string }) => void | Promise<void>;
   currentUser: User;
 }
 
@@ -48,6 +48,7 @@ const AddItem: React.FC<AddItemProps> = ({ onAdd, currentUser }) => {
   }
   const [concept, setConcept] = useState('');
   const [obra, setObra] = useState('');
+  const [category, setCategory] = useState<string>('');
   const [description, setDescription] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [quantity, setQuantity] = useState<number>(1);
@@ -70,11 +71,12 @@ const AddItem: React.FC<AddItemProps> = ({ onAdd, currentUser }) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!concept || !obra || !description || quantity < 1 || !location.trim()) return;
+    if (!concept || !obra || !description || quantity < 1 || !location.trim() || !category.trim()) return;
 
     await onAdd({
       concept,
       obra,
+      category: category.trim(),
       description,
       imageUrl: imageUrl || '',
       quantity,
@@ -109,11 +111,12 @@ const AddItem: React.FC<AddItemProps> = ({ onAdd, currentUser }) => {
       };
       const iConcepto = idx('Concepto');
       const iObra = idx('Obra');
+      const iCategoria = idx('Categoría');
       const iDesc = idx('Descripción');
       const iCant = idx('Cantidad');
       const iUbi = idx('Ubicación');
       if (iConcepto < 0 || iObra < 0 || iDesc < 0 || iCant < 0 || iUbi < 0) {
-        setImportResult({ ok: 0, errores: ['Faltan columnas. La plantilla debe tener: Concepto, Obra, Descripción, Cantidad, Ubicación.'] });
+        setImportResult({ ok: 0, errores: ['Faltan columnas. La plantilla debe tener: Concepto, Obra, Categoría (opcional), Descripción, Cantidad, Ubicación.'] });
         setImportando(false);
         return;
       }
@@ -122,6 +125,8 @@ const AddItem: React.FC<AddItemProps> = ({ onAdd, currentUser }) => {
         if (!row || row.length === 0) continue;
         const concept = (row[iConcepto] ?? '').toString().trim();
         const obra = (row[iObra] ?? '').toString().trim();
+        const catRaw = iCategoria >= 0 ? (row[iCategoria] ?? '').toString().trim() : '';
+        const category = CATEGORIAS.includes(catRaw as typeof CATEGORIAS[number]) ? catRaw : (CATEGORIAS[0] as string);
         const description = (row[iDesc] ?? '').toString().trim();
         const quantity = Math.max(1, parseInt(String(row[iCant]), 10) || 1);
         const location = (row[iUbi] ?? '').toString().trim();
@@ -130,7 +135,7 @@ const AddItem: React.FC<AddItemProps> = ({ onAdd, currentUser }) => {
           continue;
         }
         try {
-          await onAdd({ concept, obra, description, imageUrl: '', quantity, location });
+          await onAdd({ concept, obra, category, description, imageUrl: '', quantity, location });
           ok++;
         } catch (err) {
           errores.push(`Fila ${r + 1}: ${err instanceof Error ? err.message : 'Error al guardar'}.`);
@@ -218,6 +223,20 @@ const AddItem: React.FC<AddItemProps> = ({ onAdd, currentUser }) => {
                   onChange={(e) => setObra(e.target.value)}
                 />
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-slate-700">Categorías</label>
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                className="w-full px-4 py-3 bg-slate-50 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-slate-700"
+              >
+                <option value="">Seleccione una categoría</option>
+                {CATEGORIAS.map((cat) => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+              </select>
             </div>
 
             <div className="space-y-2">
