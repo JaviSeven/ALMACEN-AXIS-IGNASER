@@ -51,7 +51,7 @@ const AddItem: React.FC<AddItemProps> = ({ onAdd, currentUser }) => {
   const [category, setCategory] = useState<string>('');
   const [description, setDescription] = useState('');
   const [imageUrl, setImageUrl] = useState('');
-  const [quantity, setQuantity] = useState<number>(1);
+  const [quantity, setQuantity] = useState<string>('');
   const [location, setLocation] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const excelInputRef = useRef<HTMLInputElement>(null);
@@ -71,7 +71,8 @@ const AddItem: React.FC<AddItemProps> = ({ onAdd, currentUser }) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!concept || !obra || !description || quantity < 1 || !location.trim() || !category.trim()) return;
+    const quantityNumber = parseInt(quantity, 10);
+    if (!concept || !obra || !description || !quantity || isNaN(quantityNumber) || quantityNumber < 1 || !location.trim() || !category.trim()) return;
 
     await onAdd({
       concept,
@@ -79,7 +80,7 @@ const AddItem: React.FC<AddItemProps> = ({ onAdd, currentUser }) => {
       category: category.trim(),
       description,
       imageUrl: imageUrl || '',
-      quantity,
+      quantity: quantityNumber,
       location: location.trim()
     });
 
@@ -263,7 +264,7 @@ const AddItem: React.FC<AddItemProps> = ({ onAdd, currentUser }) => {
                   className="w-full px-4 py-3 bg-slate-50 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
                   placeholder="Cantidad que entra"
                   value={quantity}
-                  onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                  onChange={(e) => setQuantity(e.target.value)}
                 />
               </div>
               <div className="space-y-2">

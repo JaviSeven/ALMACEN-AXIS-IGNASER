@@ -310,7 +310,7 @@ const App: React.FC = () => {
     setItems(prev => prev.filter(i => i.id !== itemId));
   };
 
-  const updateItem = async (itemId: string, updates: { description?: string; imageUrl?: string; concept?: string; obra?: string; category?: string }) => {
+  const updateItem = async (itemId: string, updates: { description?: string; imageUrl?: string; concept?: string; obra?: string; category?: string; location?: string; quantity?: number }) => {
     if (!currentUser || currentUser.role === 'SoloLectura') return;
     const now = Date.now();
     const payload: Record<string, unknown> = { updated_at: now };
@@ -319,6 +319,8 @@ const App: React.FC = () => {
     if (updates.concept !== undefined) payload.concept = updates.concept;
     if (updates.obra !== undefined) payload.obra = updates.obra;
     if (updates.category !== undefined) payload.category = updates.category;
+    if (updates.location !== undefined) payload.location = updates.location ?? null;
+    if (updates.quantity !== undefined) payload.quantity = updates.quantity;
     const { error } = await supabase.from('items').update(payload).eq('id', itemId);
     if (error) {
       console.error('Error actualizando item:', error);
