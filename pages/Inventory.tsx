@@ -7,7 +7,7 @@ interface InventoryProps {
   items: StockItem[];
   onMaterialOut: (itemId: string, amount: number, obraDestino: string) => void;
   onDelete: (id: string) => void;
-  onUpdateItem: (itemId: string, updates: { description?: string; imageUrl?: string; concept?: string; obra?: string; category?: string; location?: string; quantity?: number }) => void | Promise<void>;
+  onUpdateItem: (itemId: string, updates: { description?: string; imageUrl?: string; concept?: string; obra?: string; category?: string; location?: string }) => void | Promise<void>;
   currentUser: User;
 }
 
@@ -24,7 +24,6 @@ const Inventory: React.FC<InventoryProps> = ({ items, onMaterialOut, onDelete, o
   const [editDescription, setEditDescription] = useState('');
   const [editImageUrl, setEditImageUrl] = useState('');
   const [editLocation, setEditLocation] = useState('');
-  const [editQuantity, setEditQuantity] = useState<string>('');
   const [guardando, setGuardando] = useState(false);
   const previewPhotoInputRef = useRef<HTMLInputElement>(null);
 
@@ -36,7 +35,6 @@ const Inventory: React.FC<InventoryProps> = ({ items, onMaterialOut, onDelete, o
       setEditDescription(previewItem.description);
       setEditImageUrl(previewItem.imageUrl || '');
       setEditLocation(previewItem.location || '');
-      setEditQuantity(previewItem.quantity.toString());
     }
   }, [previewItem]);
 
@@ -339,20 +337,7 @@ const Inventory: React.FC<InventoryProps> = ({ items, onMaterialOut, onDelete, o
 
               <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between">
                 <span className="text-slate-500 text-sm">Stock en almacén:</span>
-                {currentUser.role !== 'SoloLectura' ? (
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      min={0}
-                      className="w-24 px-3 py-1.5 bg-slate-50 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 text-right"
-                      value={editQuantity}
-                      onChange={(e) => setEditQuantity(e.target.value)}
-                    />
-                    <span className="text-xs font-medium text-slate-500">uds.</span>
-                  </div>
-                ) : (
-                  <span className="text-2xl font-black text-slate-800">{previewItem.quantity} uds.</span>
-                )}
+                <span className="text-2xl font-black text-slate-800">{previewItem.quantity} uds.</span>
               </div>
 
               {currentUser.role !== 'SoloLectura' && (
@@ -360,7 +345,6 @@ const Inventory: React.FC<InventoryProps> = ({ items, onMaterialOut, onDelete, o
                   <button
                     type="button"
                     onClick={async () => {
-                      const parsedQty = editQuantity.trim() === '' ? previewItem.quantity : Math.max(0, parseInt(editQuantity, 10) || 0);
                       setGuardando(true);
                       await onUpdateItem(previewItem.id, {
                         description: editDescription,
@@ -368,10 +352,9 @@ const Inventory: React.FC<InventoryProps> = ({ items, onMaterialOut, onDelete, o
                         concept: editConcept,
                         obra: editObra,
                         category: editCategory,
-                        location: editLocation || undefined,
-                        quantity: parsedQty
+                        location: editLocation || undefined
                       });
-                      setPreviewItem(prev => prev ? { ...prev, concept: editConcept, obra: editObra, category: editCategory, description: editDescription, imageUrl: editImageUrl, location: editLocation || undefined, quantity: parsedQty } : null);
+                      setPreviewItem(prev => prev ? { ...prev, concept: editConcept, obra: editObra, category: editCategory, description: editDescription, imageUrl: editImageUrl, location: editLocation || undefined } : null);
                       setGuardando(false);
                     }}
                     disabled={guardando}
