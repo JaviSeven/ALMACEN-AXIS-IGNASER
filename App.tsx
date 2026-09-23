@@ -14,20 +14,25 @@ import {
   LogOut,
   Camera,
   Trash2,
-  ChevronRight
+  ChevronRight,
+  ClipboardCheck
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import ExcelJS from 'exceljs';
 
 import { supabase } from './supabaseClient';
-import { StockItem, Movement, User, UserRole } from './types';
+import { StockItem, Movement, User, UserRole, InventoryRequest } from './types';
 import Dashboard from './pages/Dashboard';
 import Inventory from './pages/Inventory';
 import MovementsHistory from './pages/MovementsHistory';
 import AddItem from './pages/AddItem';
+import Requests from './pages/Requests';
 
-function userFromSession(user: { id: string; email?: string; user_metadata?: Record<string, unknown> }): User {
-  const role = (user.user_metadata?.role as UserRole) ?? 'SoloLectura';
+function userFromSession(user: { id: string; email?: string; user_metadata?: Record<string, unknown>; app_metadata?: Record<string, unknown> }): User {
+  const rawRole = user.app_metadata?.role;
+  const role: UserRole = rawRole === 'Admin' || rawRole === 'Operario' || rawRole === 'Axis'
+    ? rawRole
+    : 'SoloLectura';
   const name = (user.user_metadata?.name as string) ?? user.email ?? 'Usuario';
   return { id: user.id, name, role };
 }
@@ -36,62 +41,79 @@ const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [items, setItems] = useState<StockItem[]>([]);
   const [movements, setMovements] = useState<Movement[]>([]);
+  const [requests, setRequests] = useState<InventoryRequest[]>([]);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
 
-  // Session + load data
+  const loadWarehouseData = async () => {
+    const [itemsRes, movementsRes, requestsRes] = await Promise.all([
+      supabase.from('items').select('*').order('created_at', { ascending: false }),
+      supabase.from('movements').select('*').order('timestamp', { ascending: false }),
+      supabase.from('inventory_requests').select('*').order('requested_at', { ascending: false })
+    ]);
+
+    if (itemsRes.data) {
+      setItems(itemsRes.data.map((row: Record<string, unknown>) => ({
+        id: row.id as string,
+        concept: row.concept as string,
+        description: row.description as string,
+        obra: row.obra as string,
+        quantity: Number(row.quantity),
+        location: (row.location as string) || undefined,
+        imageUrl: (row.image_url as string) ?? '',
+        category: (row.category as string) || undefined,
+        createdAt: Number(row.created_at),
+        updatedAt: Number(row.updated_at)
+      })));
+    }
+    if (movementsRes.data) {
+      setMovements(movementsRes.data.map((row: Record<string, unknown>) => ({
+        id: row.id as string,
+        itemId: row.item_id as string,
+        itemConcept: row.item_concept as string,
+        userId: row.user_id as string,
+        userName: row.user_name as string,
+        type: row.type as Movement['type'],
+        quantityChange: Number(row.quantity_change),
+        newQuantity: Number(row.new_quantity),
+        timestamp: Number(row.timestamp),
+        note: (row.note as string) || undefined,
+        obraProcedencia: (row.obra_procedencia as string) || undefined,
+        obraDestino: (row.obra_destino as string) || undefined
+      })));
+    }
+    if (requestsRes.data) {
+      setRequests(requestsRes.data.map((row: Record<string, unknown>) => ({
+        id: row.id as string,
+        concept: row.concept as string,
+        description: row.description as string,
+        obra: row.obra as string,
+        quantity: Number(row.quantity),
+        location: (row.location as string) || undefined,
+        imageUrl: (row.image_url as string) ?? '',
+        category: (row.category as string) || undefined,
+        requestedBy: row.requested_by as string,
+        requestedByName: row.requested_by_name as string,
+        requestedAt: Number(row.requested_at),
+        status: row.status as InventoryRequest['status'],
+        reviewedByName: (row.reviewed_by_name as string) || undefined,
+        reviewedAt: row.reviewed_at ? Number(row.reviewed_at) : undefined,
+        createdItemId: (row.created_item_id as string) || undefined
+      })));
+    }
+  };
+
+  // La autorización se obtiene del JWT de Supabase; nunca de localStorage.
   useEffect(() => {
     const init = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
-        const user = userFromSession(session.user);
-        setCurrentUser(user);
-        localStorage.setItem('warehouse_user', JSON.stringify(user));
-      } else {
-        const savedUser = localStorage.getItem('warehouse_user');
-        if (savedUser) {
-          try {
-            setCurrentUser(JSON.parse(savedUser));
-          } catch (_) {}
-        }
+        const { data: refreshed } = await supabase.auth.refreshSession();
+        const activeUser = refreshed.session?.user ?? session.user;
+        setCurrentUser(userFromSession(activeUser));
+        await loadWarehouseData();
       }
       setAuthChecked(true);
-
-      const [itemsRes, movementsRes] = await Promise.all([
-        supabase.from('items').select('*').order('created_at', { ascending: false }),
-        supabase.from('movements').select('*').order('timestamp', { ascending: false })
-      ]);
-
-      if (itemsRes.data) {
-        setItems(itemsRes.data.map((row: Record<string, unknown>) => ({
-          id: row.id as string,
-          concept: row.concept as string,
-          description: row.description as string,
-          obra: row.obra as string,
-          quantity: Number(row.quantity),
-          location: (row.location as string) || undefined,
-          imageUrl: (row.image_url as string) ?? '',
-          category: (row.category as string) || undefined,
-          createdAt: Number(row.created_at),
-          updatedAt: Number(row.updated_at)
-        })));
-      }
-      if (movementsRes.data) {
-        setMovements(movementsRes.data.map((row: Record<string, unknown>) => ({
-          id: row.id as string,
-          itemId: row.item_id as string,
-          itemConcept: row.item_concept as string,
-          userId: row.user_id as string,
-          userName: row.user_name as string,
-          type: row.type as Movement['type'],
-          quantityChange: Number(row.quantity_change),
-          newQuantity: Number(row.new_quantity),
-          timestamp: Number(row.timestamp),
-          note: (row.note as string) || undefined,
-          obraProcedencia: (row.obra_procedencia as string) || undefined,
-          obraDestino: (row.obra_destino as string) || undefined
-        })));
-      }
     };
     init();
   }, []);
@@ -110,24 +132,71 @@ const App: React.FC = () => {
       return;
     }
     if (data.user) {
-      const user = userFromSession(data.user);
+      const { data: refreshed } = await supabase.auth.refreshSession();
+      const user = userFromSession(refreshed.session?.user ?? data.user);
       setCurrentUser(user);
-      localStorage.setItem('warehouse_user', JSON.stringify(user));
+      await loadWarehouseData();
     }
   };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
     setCurrentUser(null);
-    localStorage.removeItem('warehouse_user');
+    setItems([]);
+    setMovements([]);
+    setRequests([]);
   };
 
   const addItem = async (newItem: Omit<StockItem, 'id' | 'createdAt' | 'updatedAt'> & { quantity: number; location: string }) => {
-    if (!currentUser || currentUser.role === 'SoloLectura') return;
+    if (!currentUser || currentUser.role === 'SoloLectura') {
+      throw new Error('No tienes permiso para solicitar entradas');
+    }
+
+    const quantity = Math.max(1, newItem.quantity);
+    const now = Date.now();
+
+    if (currentUser.role === 'Axis') {
+      const id = crypto.randomUUID();
+      const { data, error } = await supabase.from('inventory_requests').insert({
+        id,
+        concept: newItem.concept,
+        description: newItem.description,
+        obra: newItem.obra,
+        quantity,
+        is_recurrent: false,
+        min_stock: null,
+        location: newItem.location,
+        image_url: newItem.imageUrl ?? '',
+        category: newItem.category ?? '',
+        requested_by: currentUser.id,
+        requested_by_name: currentUser.name,
+        requested_at: now,
+        status: 'pending'
+      }).select('*').single();
+
+      if (error) throw error;
+      setRequests(prev => [{
+        id: data.id,
+        concept: data.concept,
+        description: data.description,
+        obra: data.obra,
+        quantity: Number(data.quantity),
+        location: data.location || undefined,
+        imageUrl: data.image_url ?? '',
+        category: data.category || undefined,
+        requestedBy: data.requested_by,
+        requestedByName: data.requested_by_name,
+        requestedAt: Number(data.requested_at),
+        status: data.status
+      }, ...prev]);
+      return;
+    }
+
+    if (currentUser.role !== 'Admin' && currentUser.role !== 'Operario') {
+      throw new Error('No tienes permiso para dar entrada');
+    }
 
     const id = crypto.randomUUID();
-    const quantity = Math.max(0, newItem.quantity);
-    const now = Date.now();
     const item: StockItem = {
       ...newItem,
       id,
@@ -149,10 +218,7 @@ const App: React.FC = () => {
       created_at: now,
       updated_at: now
     });
-    if (itemError) {
-      console.error('Error insertando item:', itemError);
-      return;
-    }
+    if (itemError) throw itemError;
 
     const movementId = crypto.randomUUID();
     const movement: Movement = {
@@ -165,9 +231,7 @@ const App: React.FC = () => {
       quantityChange: quantity,
       newQuantity: quantity,
       timestamp: now,
-      note: quantity > 0
-        ? `Entrada: ${quantity} uds. Ubicación: ${item.location}. Obra: ${item.obra}`
-        : `Material recogido de obra: ${item.obra}`,
+      note: `Entrada: ${quantity} uds. Ubicación: ${item.location}. Obra: ${item.obra}`,
       obraProcedencia: item.obra,
       obraDestino: 'Almacén'
     };
@@ -186,17 +250,24 @@ const App: React.FC = () => {
       obra_procedencia: movement.obraProcedencia ?? null,
       obra_destino: movement.obraDestino ?? null
     });
-    if (movError) {
-      console.error('Error insertando movimiento:', movError);
-      return;
-    }
+    if (movError) throw movError;
 
     setItems(prev => [item, ...prev]);
     setMovements(prev => [movement, ...prev]);
   };
 
+  const reviewRequest = async (requestId: string, decision: 'approved' | 'rejected') => {
+    if (!currentUser || (currentUser.role !== 'Admin' && currentUser.role !== 'Operario')) return;
+    const { error } = await supabase.rpc('review_inventory_request', {
+      p_request_id: requestId,
+      p_decision: decision
+    });
+    if (error) throw error;
+    await loadWarehouseData();
+  };
+
   const handleMaterialOut = async (itemId: string, amount: number, obraDestino: string) => {
-    if (!currentUser || currentUser.role === 'SoloLectura') return;
+    if (!currentUser || (currentUser.role !== 'Admin' && currentUser.role !== 'Operario')) return;
 
     const item = items.find(i => i.id === itemId);
     if (!item || amount <= 0 || amount > item.quantity) return;
@@ -311,7 +382,7 @@ const App: React.FC = () => {
   };
 
   const updateItem = async (itemId: string, updates: { description?: string; imageUrl?: string; concept?: string; obra?: string; category?: string; location?: string; quantity?: number }) => {
-    if (!currentUser || currentUser.role === 'SoloLectura') return;
+    if (!currentUser || (currentUser.role !== 'Admin' && currentUser.role !== 'Operario')) return;
     const now = Date.now();
     const payload: Record<string, unknown> = { updated_at: now };
     if (updates.description !== undefined) payload.description = updates.description;
@@ -498,7 +569,10 @@ const App: React.FC = () => {
             <SidebarLink to="/inventory" icon={<Package size={20} />} label="Inventario" />
             <SidebarLink to="/history" icon={<History size={20} />} label="Historial" />
             {currentUser.role !== 'SoloLectura' && (
-              <SidebarLink to="/add" icon={<ArrowUpCircle size={20} />} label="Entrada de Material" />
+              <SidebarLink to="/add" icon={<ArrowUpCircle size={20} />} label={currentUser.role === 'Axis' ? 'Solicitar entrada' : 'Entrada de Material'} />
+            )}
+            {currentUser.role !== 'SoloLectura' && (
+              <SidebarLink to="/requests" icon={<ClipboardCheck size={20} />} label={`Solicitudes${requests.filter(r => r.status === 'pending').length ? ` (${requests.filter(r => r.status === 'pending').length})` : ''}`} />
             )}
           </nav>
 
@@ -507,7 +581,7 @@ const App: React.FC = () => {
               
               <div className="overflow-hidden">
                 <p className="text-sm font-semibold truncate">{currentUser.name}</p>
-                <p className="text-xs text-slate-400">{currentUser.role === 'SoloLectura' ? 'Solo lectura' : currentUser.role}</p>
+                <p className="text-xs text-slate-400">{currentUser.role === 'SoloLectura' ? 'Solo lectura' : currentUser.role === 'Axis' ? 'AXIS · Solicitudes' : currentUser.role}</p>
               </div>
             </div>
             <button 
@@ -566,6 +640,9 @@ const App: React.FC = () => {
               <Route path="/add" element={
                 <AddItem onAdd={addItem} currentUser={currentUser} />
               } />
+              <Route path="/requests" element={
+                <Requests requests={requests} currentUser={currentUser} onReview={reviewRequest} />
+              } />
             </Routes>
           </div>
         </main>
@@ -575,6 +652,9 @@ const App: React.FC = () => {
           <MobileLink to="/inventory" icon={<Package size={24} />} />
           {currentUser.role !== 'SoloLectura' && (
             <MobileLink to="/add" icon={<ArrowUpCircle size={32} className="text-blue-600" />} />
+          )}
+          {currentUser.role !== 'SoloLectura' && (
+            <MobileLink to="/requests" icon={<ClipboardCheck size={24} />} />
           )}
           <MobileLink to="/history" icon={<History size={24} />} />
         </nav>
@@ -590,6 +670,7 @@ const RouteTitle = () => {
     case '/inventory': return 'Gestión de Inventario';
     case '/history': return 'Historial de Movimientos';
     case '/add': return 'Entrada de Material';
+    case '/requests': return 'Solicitudes de entrada';
     default: return 'Almacén';
   }
 };
