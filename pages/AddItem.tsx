@@ -84,7 +84,7 @@ const AddItem: React.FC<AddItemProps> = ({ onAdd, currentUser }) => {
       location: location.trim()
     });
 
-    navigate('/inventory');
+    navigate(currentUser.role === 'Axis' ? '/requests' : '/inventory');
   };
 
   const handleExcelImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -143,7 +143,7 @@ const AddItem: React.FC<AddItemProps> = ({ onAdd, currentUser }) => {
         }
       }
       setImportResult({ ok, errores });
-      if (ok > 0) setTimeout(() => navigate('/inventory'), 2000);
+      if (ok > 0) setTimeout(() => navigate(currentUser.role === 'Axis' ? '/requests' : '/inventory'), 2000);
     } catch (err) {
       setImportResult({ ok: 0, errores: [err instanceof Error ? err.message : 'Error al leer el Excel.'] });
     }
@@ -154,8 +154,8 @@ const AddItem: React.FC<AddItemProps> = ({ onAdd, currentUser }) => {
     <div className="max-w-2xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12">
       <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
         <div className="p-8">
-          <h2 className="text-2xl font-bold text-slate-800 mb-2">Dar entrada a material</h2>
-          <p className="text-slate-500 mb-6 text-sm">Completa los datos del material e indica las unidades y la ubicación en el almacén.</p>
+          <h2 className="text-2xl font-bold text-slate-800 mb-2">{currentUser.role === 'Axis' ? 'Solicitar entrada de material' : 'Dar entrada a material'}</h2>
+          <p className="text-slate-500 mb-6 text-sm">{currentUser.role === 'Axis' ? 'Completa los datos. IGNASER revisará la solicitud y confirmará la recepción antes de añadirla al stock.' : 'Completa los datos del material e indica las unidades y la ubicación en el almacén.'}</p>
 
           {/* Importar desde Excel */}
           <div className="mb-8 p-4 rounded-xl bg-slate-50 border border-slate-200">
@@ -173,7 +173,7 @@ const AddItem: React.FC<AddItemProps> = ({ onAdd, currentUser }) => {
               </button>
               <label className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 cursor-pointer">
                 <Upload size={16} />
-                {importando ? 'Importando...' : 'Seleccionar Excel'}
+                {importando ? 'Importando...' : currentUser.role === 'Axis' ? 'Solicitar desde Excel' : 'Seleccionar Excel'}
                 <input
                   ref={excelInputRef}
                   type="file"
@@ -186,7 +186,7 @@ const AddItem: React.FC<AddItemProps> = ({ onAdd, currentUser }) => {
             </div>
             {importResult && (
               <div className={`mt-3 text-sm p-3 rounded-lg ${importResult.ok > 0 ? 'bg-emerald-50 text-emerald-800' : 'bg-rose-50 text-rose-800'}`}>
-                {importResult.ok > 0 && <p className="font-medium">Se han importado {importResult.ok} material(es). Redirigiendo al inventario...</p>}
+                {importResult.ok > 0 && <p className="font-medium">{currentUser.role === 'Axis' ? 'Se han enviado' : 'Se han importado'} {importResult.ok} material(es). Redirigiendo...</p>}
                 {importResult.errores.length > 0 && (
                   <ul className="list-disc list-inside mt-1">
                     {importResult.errores.slice(0, 5).map((e, i) => <li key={i}>{e}</li>)}
@@ -328,7 +328,7 @@ const AddItem: React.FC<AddItemProps> = ({ onAdd, currentUser }) => {
                 type="submit"
                 className="flex-[2] px-6 py-4 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-500/20 transition-all flex items-center justify-center gap-2 active:scale-95"
               >
-                <Save size={20} /> Dar entrada
+                <Save size={20} /> {currentUser.role === 'Axis' ? 'Enviar solicitud' : 'Dar entrada'}
               </button>
             </div>
           </form>
