@@ -25,6 +25,7 @@ const Inventory: React.FC<InventoryProps> = ({ items, onMaterialOut, onDelete, o
   const [editImageUrl, setEditImageUrl] = useState('');
   const [editLocation, setEditLocation] = useState('');
   const [guardando, setGuardando] = useState(false);
+  const canManageInventory = currentUser.role === 'Admin' || currentUser.role === 'Operario';
   const previewPhotoInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -158,7 +159,7 @@ const Inventory: React.FC<InventoryProps> = ({ items, onMaterialOut, onDelete, o
                     {item.quantity} <span className="text-xs font-medium text-slate-400">uds.</span>
                   </span>
                 </div>
-                {currentUser.role !== 'SoloLectura' && (
+                {canManageInventory && (
                   <button
                     onClick={() => openSalidaModal(item)}
                     disabled={item.quantity === 0}
@@ -190,7 +191,7 @@ const Inventory: React.FC<InventoryProps> = ({ items, onMaterialOut, onDelete, o
             onClick={e => e.stopPropagation()}
           >
             <div className="relative h-56 bg-slate-100">
-              {currentUser.role !== 'SoloLectura' ? (
+              {canManageInventory ? (
                 <div
                   className="w-full h-full flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 transition-colors relative group"
                   onClick={() => previewPhotoInputRef.current?.click()}
@@ -241,7 +242,7 @@ const Inventory: React.FC<InventoryProps> = ({ items, onMaterialOut, onDelete, o
               </button>
             </div>
             <div className="p-6">
-              {currentUser.role !== 'SoloLectura' ? (
+              {canManageInventory ? (
                 <>
                   <label className="block text-sm font-semibold text-slate-700 mb-1">Concepto / Nombre</label>
                   <input
@@ -257,7 +258,7 @@ const Inventory: React.FC<InventoryProps> = ({ items, onMaterialOut, onDelete, o
               )}
               <p className="text-xs text-slate-400 font-mono mt-1">ID: {previewItem.id}</p>
 
-              {currentUser.role !== 'SoloLectura' ? (
+              {canManageInventory ? (
                 <>
                   <label className="block text-sm font-semibold text-slate-700 mt-4 mb-1">Obra de procedencia</label>
                   <input
@@ -309,7 +310,7 @@ const Inventory: React.FC<InventoryProps> = ({ items, onMaterialOut, onDelete, o
                 </>
               )}
 
-              {currentUser.role !== 'SoloLectura' && (
+              {canManageInventory && (
                 <div className="mt-4 flex flex-wrap gap-3 text-sm">
                   <span className="flex items-center gap-1 text-slate-600">
                     <MapPin size={14} className="text-blue-600" /> {editObra || '—'}
@@ -322,7 +323,7 @@ const Inventory: React.FC<InventoryProps> = ({ items, onMaterialOut, onDelete, o
                   )}
                 </div>
               )}
-              {currentUser.role === 'SoloLectura' && (
+              {!canManageInventory && (
                 <div className="mt-4 flex flex-wrap gap-3 text-sm">
                   <span className="flex items-center gap-1 text-slate-600">
                     <MapPin size={14} className="text-blue-600" /> {previewItem.obra}
@@ -340,7 +341,7 @@ const Inventory: React.FC<InventoryProps> = ({ items, onMaterialOut, onDelete, o
                 <span className="text-2xl font-black text-slate-800">{previewItem.quantity} uds.</span>
               </div>
 
-              {currentUser.role !== 'SoloLectura' && (
+              {canManageInventory && (
                 <div className="mt-4 flex gap-3">
                   <button
                     type="button"
@@ -373,7 +374,7 @@ const Inventory: React.FC<InventoryProps> = ({ items, onMaterialOut, onDelete, o
                   )}
                 </div>
               )}
-              {currentUser.role === 'SoloLectura' && previewItem.quantity > 0 && (
+              {!canManageInventory && previewItem.quantity > 0 && (
                 <p className="mt-4 text-xs text-slate-400">Solo lectura: no puedes editar ni dar salida.</p>
               )}
             </div>
