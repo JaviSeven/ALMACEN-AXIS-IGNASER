@@ -1,5 +1,5 @@
 
-export type UserRole = 'Admin' | 'Operario' | 'SoloLectura';
+export type UserRole = 'Admin' | 'Operario' | 'Axis' | 'SoloLectura';
 
 export interface User {
   id: string;
@@ -23,6 +23,26 @@ export const CATEGORIAS = [
 ] as const;
 
 export type Categoria = typeof CATEGORIAS[number];
+
+export type InventoryRequestStatus = 'pending' | 'approved' | 'rejected';
+
+export interface InventoryRequest {
+  id: string;
+  concept: string;
+  description: string;
+  obra: string;
+  quantity: number;
+  location?: string;
+  imageUrl: string;
+  category?: string;
+  requestedBy: string;
+  requestedByName: string;
+  requestedAt: number;
+  status: InventoryRequestStatus;
+  reviewedByName?: string;
+  reviewedAt?: number;
+  createdItemId?: string;
+}
 
 export interface StockItem {
   id: string;
@@ -56,6 +76,6 @@ export interface Movement {
 
 export const USERS: User[] = [
   { id: 'u1', name: 'IGNASER', role: 'Admin' },
-  { id: 'u2', name: 'AXIS', role: 'SoloLectura' }
+  { id: 'u2', name: 'AXIS', role: 'Axis' }
 ];
 
