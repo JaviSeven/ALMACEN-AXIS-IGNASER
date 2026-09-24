@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { CheckCircle2, Clock3, MapPin, Package, XCircle } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { CheckCircle2, Clock3, MapPin, Maximize2, Package, X, XCircle } from 'lucide-react';
 import { InventoryRequest, User } from '../types';
 
 interface RequestsProps {
@@ -18,7 +18,22 @@ const Requests: React.FC<RequestsProps> = ({ requests, currentUser, onReview }) 
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [locations, setLocations] = useState<Record<string, string>>({});
+  const [selectedImage, setSelectedImage] = useState<{ url: string; alt: string } | null>(null);
   const canReview = currentUser.role === 'Admin' || currentUser.role === 'Operario';
+
+  useEffect(() => {
+    if (!selectedImage) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setSelectedImage(null);
+    };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [selectedImage]);
 
   const ordered = useMemo(
     () => [...requests].sort((a, b) => {
@@ -71,11 +86,24 @@ const Requests: React.FC<RequestsProps> = ({ requests, currentUser, onReview }) 
             <div className="p-5 md:p-6">
               <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
                 <div className="flex gap-4 min-w-0">
-                  <div className="w-16 h-16 rounded-xl bg-slate-100 overflow-hidden shrink-0 flex items-center justify-center">
-                    {request.imageUrl
-                      ? <img src={request.imageUrl} alt="" className="w-full h-full object-cover" />
-                      : <Package className="text-slate-400" size={28} />}
-                  </div>
+                  {request.imageUrl ? (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedImage({ url: request.imageUrl, alt: request.concept })}
+                      className="relative w-16 h-16 rounded-xl bg-slate-100 overflow-hidden shrink-0 group focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      title="Ampliar fotografía"
+                      aria-label={`Ampliar fotografía de ${request.concept}`}
+                    >
+                      <img src={request.imageUrl} alt={request.concept} className="w-full h-full object-cover transition-transform group-hover:scale-105" />
+                      <span className="absolute inset-0 bg-black/0 group-hover:bg-black/35 transition-colors flex items-center justify-center">
+                        <Maximize2 className="text-white opacity-0 group-hover:opacity-100 transition-opacity" size={20} />
+                      </span>
+                    </button>
+                  ) : (
+                    <div className="w-16 h-16 rounded-xl bg-slate-100 shrink-0 flex items-center justify-center">
+                      <Package className="text-slate-400" size={28} />
+                    </div>
+                  )}
                   <div className="min-w-0">
                     <h3 className="font-bold text-slate-800 text-lg">{request.concept}</h3>
                     <p className="text-sm text-slate-500 mt-1">{request.description}</p>
@@ -156,6 +184,34 @@ const Requests: React.FC<RequestsProps> = ({ requests, currentUser, onReview }) 
           </div>
         )}
       </div>
+
+      {selectedImage && (
+        <div
+          className="fixed inset-0 z-[100] bg-black/85 p-4 md:p-8 flex items-center justify-center"
+          onClick={() => setSelectedImage(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Fotografía ampliada de ${selectedImage.alt}`}
+        >
+          <div className="relative max-w-[95vw] max-h-[92vh]" onClick={event => event.stopPropagation()}>
+            <img
+              src={selectedImage.url}
+              alt={selectedImage.alt}
+              className="max-w-[95vw] max-h-[88vh] object-contain rounded-xl shadow-2xl bg-white"
+            />
+            <button
+              type="button"
+              onClick={() => setSelectedImage(null)}
+              className="absolute -top-3 -right-3 p-2.5 rounded-full bg-white text-slate-700 shadow-lg hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              aria-label="Cerrar imagen ampliada"
+              title="Cerrar"
+            >
+              <X size={22} />
+            </button>
+            <p className="mt-3 text-center text-sm font-medium text-white">{selectedImage.alt}</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
