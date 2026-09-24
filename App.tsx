@@ -256,11 +256,12 @@ const App: React.FC = () => {
     setMovements(prev => [movement, ...prev]);
   };
 
-  const reviewRequest = async (requestId: string, decision: 'approved' | 'rejected') => {
+  const reviewRequest = async (requestId: string, decision: 'approved' | 'rejected', location?: string) => {
     if (!currentUser || (currentUser.role !== 'Admin' && currentUser.role !== 'Operario')) return;
-    const { error } = await supabase.rpc('review_inventory_request', {
+    const { error } = await supabase.rpc('review_inventory_request_v2', {
       p_request_id: requestId,
-      p_decision: decision
+      p_decision: decision,
+      p_location: decision === 'approved' ? location?.trim() : null
     });
     if (error) throw error;
     await loadWarehouseData();

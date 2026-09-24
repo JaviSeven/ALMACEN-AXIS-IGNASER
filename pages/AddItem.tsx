@@ -72,7 +72,8 @@ const AddItem: React.FC<AddItemProps> = ({ onAdd, currentUser }) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const quantityNumber = parseInt(quantity, 10);
-    if (!concept || !obra || !description || !quantity || isNaN(quantityNumber) || quantityNumber < 1 || !location.trim() || !category.trim()) return;
+    if (!concept || !obra || !description || !quantity || isNaN(quantityNumber) || quantityNumber < 1 || !category.trim()) return;
+    if (currentUser.role !== 'Axis' && !location.trim()) return;
 
     await onAdd({
       concept,
@@ -81,7 +82,7 @@ const AddItem: React.FC<AddItemProps> = ({ onAdd, currentUser }) => {
       description,
       imageUrl: imageUrl || '',
       quantity: quantityNumber,
-      location: location.trim()
+      location: currentUser.role === 'Axis' ? '' : location.trim()
     });
 
     navigate(currentUser.role === 'Axis' ? '/requests' : '/inventory');
@@ -116,8 +117,10 @@ const AddItem: React.FC<AddItemProps> = ({ onAdd, currentUser }) => {
       const iDesc = idx('Descripción');
       const iCant = idx('Cantidad');
       const iUbi = idx('Ubicación');
-      if (iConcepto < 0 || iObra < 0 || iDesc < 0 || iCant < 0 || iUbi < 0) {
-        setImportResult({ ok: 0, errores: ['Faltan columnas. La plantilla debe tener: Concepto, Obra, Categoría (opcional), Descripción, Cantidad, Ubicación.'] });
+      if (iConcepto < 0 || iObra < 0 || iDesc < 0 || iCant < 0 || (currentUser.role !== 'Axis' && iUbi < 0)) {
+        setImportResult({ ok: 0, errores: [currentUser.role === 'Axis'
+          ? 'Faltan columnas. La plantilla debe tener: Concepto, Obra, Categoría (opcional), Descripción y Cantidad.'
+          : 'Faltan columnas. La plantilla debe tener: Concepto, Obra, Categoría (opcional), Descripción, Cantidad y Ubicación.'] });
         setImportando(false);
         return;
       }
@@ -130,8 +133,8 @@ const AddItem: React.FC<AddItemProps> = ({ onAdd, currentUser }) => {
         const category = CATEGORIAS.includes(catRaw as typeof CATEGORIAS[number]) ? catRaw : (CATEGORIAS[0] as string);
         const description = (row[iDesc] ?? '').toString().trim();
         const quantity = Math.max(1, parseInt(String(row[iCant]), 10) || 1);
-        const location = (row[iUbi] ?? '').toString().trim();
-        if (!concept || !obra || !description || !location) {
+        const location = currentUser.role === 'Axis' ? '' : (row[iUbi] ?? '').toString().trim();
+        if (!concept || !obra || !description || (currentUser.role !== 'Axis' && !location)) {
           errores.push(`Fila ${r + 1}: faltan datos.`);
           continue;
         }
@@ -162,7 +165,9 @@ const AddItem: React.FC<AddItemProps> = ({ onAdd, currentUser }) => {
             <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
               <FileSpreadsheet size={18} className="text-emerald-600" /> Importar desde Excel
             </h3>
-            <p className="text-xs text-slate-500 mb-3">Descarga la plantilla, rellena las filas y súbela para dar entrada a varios materiales a la vez (sin foto).</p>
+            <p className="text-xs text-slate-500 mb-3">{currentUser.role === 'Axis'
+              ? 'Descarga la plantilla y súbela. La ubicación se dejará en blanco para que IGNASER la indique al recibir el material.'
+              : 'Descarga la plantilla, rellena las filas y súbela para dar entrada a varios materiales a la vez (sin foto).'}</p>
             <div className="flex flex-wrap gap-3">
               <button
                 type="button"
@@ -267,19 +272,21 @@ const AddItem: React.FC<AddItemProps> = ({ onAdd, currentUser }) => {
                   onChange={(e) => setQuantity(e.target.value)}
                 />
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-slate-700 flex items-center gap-1">
-                  <MapPinned size={14} className="text-blue-600" /> Ubicación en el almacén
-                </label>
-                <input
-                  required
-                  type="text"
-                  className="w-full px-4 py-3 bg-slate-50 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-                  placeholder="Ej. Estantería A3, Pasillo 2"
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                />
-              </div>
+              {currentUser.role !== 'Axis' && (
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-slate-700 flex items-center gap-1">
+                    <MapPinned size={14} className="text-blue-600" /> Ubicación en el almacén
+                  </label>
+                  <input
+                    required
+                    type="text"
+                    className="w-full px-4 py-3 bg-slate-50 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                    placeholder="Ej. Estantería A3, Pasillo 2"
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value)}
+                  />
+                </div>
+              )}
             </div>
 
             <div className="space-y-4">
