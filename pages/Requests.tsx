@@ -5,7 +5,7 @@ import { InventoryRequest, User } from '../types';
 interface RequestsProps {
   requests: InventoryRequest[];
   currentUser: User;
-  onReview: (requestId: string, decision: 'approved' | 'rejected') => Promise<void>;
+  onReview: (requestId: string, decision: 'approved' | 'rejected', location?: string) => Promise<void>;
 }
 
 const statusLabels = {
@@ -17,6 +17,7 @@ const statusLabels = {
 const Requests: React.FC<RequestsProps> = ({ requests, currentUser, onReview }) => {
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [locations, setLocations] = useState<Record<string, string>>({});
   const canReview = currentUser.role === 'Admin' || currentUser.role === 'Operario';
 
   const ordered = useMemo(
@@ -29,10 +30,15 @@ const Requests: React.FC<RequestsProps> = ({ requests, currentUser, onReview }) 
   );
 
   const review = async (id: string, decision: 'approved' | 'rejected') => {
+    const location = locations[id]?.trim();
+    if (decision === 'approved' && !location) {
+      setError('Indica la ubicación en el almacén antes de aprobar la entrada.');
+      return;
+    }
     setProcessingId(id);
     setError(null);
     try {
-      await onReview(id, decision);
+      await onReview(id, decision, location);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se ha podido revisar la solicitud.');
     } finally {
@@ -105,23 +111,34 @@ const Requests: React.FC<RequestsProps> = ({ requests, currentUser, onReview }) 
                 </div>
 
                 {canReview && request.status === 'pending' && (
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      disabled={processingId === request.id}
-                      onClick={() => review(request.id, 'rejected')}
-                      className="px-4 py-2 rounded-xl bg-rose-50 text-rose-700 font-semibold text-sm hover:bg-rose-100 disabled:opacity-50"
-                    >
-                      Rechazar
-                    </button>
-                    <button
-                      type="button"
-                      disabled={processingId === request.id}
-                      onClick={() => review(request.id, 'approved')}
-                      className="px-4 py-2 rounded-xl bg-emerald-600 text-white font-semibold text-sm hover:bg-emerald-700 disabled:opacity-50"
-                    >
-                      {processingId === request.id ? 'Procesando...' : 'Aprobar como recibida'}
-                    </button>
+                  <div className="w-full sm:w-auto flex flex-col gap-2">
+                    <label className="text-xs font-semibold text-slate-600">Ubicación en el almacén</label>
+                    <input
+                      type="text"
+                      required
+                      value={locations[request.id] ?? ''}
+                      onChange={event => setLocations(prev => ({ ...prev, [request.id]: event.target.value }))}
+                      placeholder="Ej. Estantería A3, Pasillo 2"
+                      className="w-full sm:w-72 px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        disabled={processingId === request.id}
+                        onClick={() => review(request.id, 'rejected')}
+                        className="px-4 py-2 rounded-xl bg-rose-50 text-rose-700 font-semibold text-sm hover:bg-rose-100 disabled:opacity-50"
+                      >
+                        Rechazar
+                      </button>
+                      <button
+                        type="button"
+                        disabled={processingId === request.id || !(locations[request.id]?.trim())}
+                        onClick={() => review(request.id, 'approved')}
+                        className="px-4 py-2 rounded-xl bg-emerald-600 text-white font-semibold text-sm hover:bg-emerald-700 disabled:opacity-50"
+                      >
+                        {processingId === request.id ? 'Procesando...' : 'Aprobar como recibida'}
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
