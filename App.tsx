@@ -392,11 +392,49 @@ const App: React.FC = () => {
     if (updates.obra !== undefined) payload.obra = updates.obra;
     if (updates.category !== undefined) payload.category = updates.category;
     if (updates.location !== undefined) payload.location = updates.location ?? null;
-    if (updates.quantity !== undefined) payload.quantity = updates.quantity;
+    const current = items.find(i => i.id === itemId);
+    // Solo el Admin puede ajustar unidades directamente
+    const quantityChanged = currentUser.role === 'Admin' && current !== undefined
+      && updates.quantity !== undefined && updates.quantity !== current.quantity;
+    if (quantityChanged) payload.quantity = updates.quantity;
+    else delete updates.quantity;
     const { error } = await supabase.from('items').update(payload).eq('id', itemId);
     if (error) {
       console.error('Error actualizando item:', error);
+      alert(`No se pudieron guardar los cambios: ${error.message}`);
       return;
+    }
+    if (quantityChanged && current) {
+      const newQuantity = updates.quantity as number;
+      const movement: Movement = {
+        id: crypto.randomUUID(),
+        itemId,
+        itemConcept: updates.concept ?? current.concept,
+        userId: currentUser.id,
+        userName: currentUser.name,
+        type: 'ADJUST',
+        quantityChange: newQuantity - current.quantity,
+        newQuantity,
+        timestamp: now,
+        note: `Ajuste de unidades: ${current.quantity} → ${newQuantity}`,
+        obraProcedencia: updates.obra ?? current.obra
+      };
+      const { error: movError } = await supabase.from('movements').insert({
+        id: movement.id,
+        item_id: itemId,
+        item_concept: movement.itemConcept,
+        user_id: movement.userId,
+        user_name: movement.userName,
+        type: movement.type,
+        quantity_change: movement.quantityChange,
+        new_quantity: movement.newQuantity,
+        timestamp: now,
+        note: movement.note,
+        obra_procedencia: movement.obraProcedencia ?? null,
+        obra_destino: null
+      });
+      if (movError) console.error('Error registrando ajuste de unidades:', movError);
+      else setMovements(prev => [movement, ...prev]);
     }
     setItems(prev => prev.map(i =>
       i.id === itemId ? { ...i, ...updates, updatedAt: now } : i
