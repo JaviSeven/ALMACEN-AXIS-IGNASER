@@ -520,6 +520,7 @@ const App: React.FC = () => {
     sheet.columns = [
       { header: 'Foto', key: 'foto', width: 14 },
       { header: 'Concepto', key: 'concept', width: 22 },
+      { header: 'Categoría', key: 'category', width: 18 },
       { header: 'Obra', key: 'obra', width: 18 },
       { header: 'Descripción', key: 'description', width: 30 },
       { header: 'Cantidad', key: 'quantity', width: 10 },
@@ -532,11 +533,17 @@ const App: React.FC = () => {
     const imgSize = { width: 80, height: 80 };
     const rowHeight = 62;
 
-    items.forEach((item, index) => {
+    const sortedItems = [...items].sort((a, b) =>
+      (a.category || 'ZZZ').localeCompare(b.category || 'ZZZ', 'es', { sensitivity: 'base' }) ||
+      a.concept.localeCompare(b.concept, 'es', { sensitivity: 'base' })
+    );
+
+    sortedItems.forEach((item, index) => {
       const rowIndex = index + 2;
       sheet.addRow({
         foto: '',
         concept: item.concept,
+        category: item.category || 'Sin categoría',
         obra: item.obra,
         description: item.description,
         quantity: item.quantity,
