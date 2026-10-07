@@ -29,7 +29,7 @@ interface AddItemProps {
 const AddItem: React.FC<AddItemProps> = ({ items, onAdd, onRestock, currentUser }) => {
   const navigate = useNavigate();
   const isAxis = currentUser.role === 'Axis';
-  const [mode, setMode] = useState<'existing' | 'new' | null>(isAxis ? 'new' : null);
+  const [mode, setMode] = useState<'existing' | 'new' | null>(null);
 
   if (currentUser.role === 'SoloLectura') {
     return (
@@ -159,10 +159,10 @@ const AddItem: React.FC<AddItemProps> = ({ items, onAdd, onRestock, currentUser 
 
   return (
     <div className="max-w-2xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12 space-y-6">
-      {!isAxis && <ModeSelector mode={mode} onChange={setMode} />}
+      <ModeSelector mode={mode} onChange={setMode} isRequest={isAxis} />
 
       {mode === 'existing' && (
-        <RestockForm items={items} onRestock={onRestock} onDone={() => navigate('/inventory')} onCancel={() => setMode(null)} />
+        <RestockForm items={items} onRestock={onRestock} isRequest={isAxis} onDone={() => navigate(isAxis ? '/requests' : '/inventory')} onCancel={() => setMode(null)} />
       )}
 
       {mode === 'new' && (
@@ -357,7 +357,7 @@ const AddItem: React.FC<AddItemProps> = ({ items, onAdd, onRestock, currentUser 
   );
 };
 
-const ModeSelector: React.FC<{ mode: 'existing' | 'new' | null; onChange: (m: 'existing' | 'new') => void }> = ({ mode, onChange }) => {
+const ModeSelector: React.FC<{ mode: 'existing' | 'new' | null; onChange: (m: 'existing' | 'new') => void; isRequest?: boolean }> = ({ mode, onChange, isRequest }) => {
   const base = 'flex-1 text-left p-5 rounded-2xl border-2 transition-all flex items-start gap-4';
   return (
     <div>
@@ -375,7 +375,7 @@ const ModeSelector: React.FC<{ mode: 'existing' | 'new' | null; onChange: (m: 'e
           </div>
           <div>
             <p className="font-bold text-slate-800">Actualizar material existente</p>
-            <p className="text-xs text-slate-500 mt-1">Suma unidades a un material que ya está en el inventario.</p>
+            <p className="text-xs text-slate-500 mt-1">{isRequest ? 'Solicita más unidades de un material que ya está en el inventario.' : 'Suma unidades a un material que ya está en el inventario.'}</p>
           </div>
         </button>
         <button
@@ -388,7 +388,7 @@ const ModeSelector: React.FC<{ mode: 'existing' | 'new' | null; onChange: (m: 'e
           </div>
           <div>
             <p className="font-bold text-slate-800">Entrada nuevo material</p>
-            <p className="text-xs text-slate-500 mt-1">Da de alta un material que todavía no existe.</p>
+            <p className="text-xs text-slate-500 mt-1">{isRequest ? 'Solicita la entrada de un material que todavía no existe.' : 'Da de alta un material que todavía no existe.'}</p>
           </div>
         </button>
       </div>
@@ -402,9 +402,10 @@ const normalizeText = (value: string) =>
 const RestockForm: React.FC<{
   items: StockItem[];
   onRestock: (itemId: string, amount: number, obraProcedencia: string, note: string) => Promise<boolean>;
+  isRequest?: boolean;
   onDone: () => void;
   onCancel: () => void;
-}> = ({ items, onRestock, onDone, onCancel }) => {
+}> = ({ items, onRestock, isRequest, onDone, onCancel }) => {
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -457,14 +458,16 @@ const RestockForm: React.FC<{
     const ok = await onRestock(selected.id, parsedAmount, obra, note);
     setSaving(false);
     if (ok) onDone();
-    else setError('No se pudo guardar la entrada. Inténtalo de nuevo.');
+    else setError(isRequest ? 'No se pudo enviar la solicitud. Inténtalo de nuevo.' : 'No se pudo guardar la entrada. Inténtalo de nuevo.');
   };
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm">
       <div className="p-8">
         <h2 className="text-2xl font-bold text-slate-800 mb-2">Actualizar material existente</h2>
-        <p className="text-slate-500 mb-8 text-sm">Busca el material, elige cuántas unidades entran y guarda.</p>
+        <p className="text-slate-500 mb-8 text-sm">{isRequest
+          ? 'Busca el material y cuántas unidades vas a enviar. IGNASER confirmará la recepción antes de sumarlas al stock.'
+          : 'Busca el material, elige cuántas unidades entran y guarda.'}</p>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-2" ref={boxRef}>
@@ -616,7 +619,7 @@ const RestockForm: React.FC<{
               disabled={!canSave}
               className="flex-[2] px-6 py-4 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-500/20 transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 disabled:active:scale-100"
             >
-              <Save size={20} /> {saving ? 'Guardando...' : 'Actualizar stock'}
+              <Save size={20} /> {saving ? (isRequest ? 'Enviando...' : 'Guardando...') : (isRequest ? 'Enviar solicitud' : 'Actualizar stock')}
             </button>
           </div>
         </form>

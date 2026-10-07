@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, Clock3, MapPin, Maximize2, Package, X, XCircle } from 'lucide-react';
-import { InventoryRequest, User } from '../types';
+import { InventoryRequest, StockItem, User } from '../types';
 
 interface RequestsProps {
   requests: InventoryRequest[];
+  items: StockItem[];
   currentUser: User;
   onReview: (requestId: string, decision: 'approved' | 'rejected', location?: string) => Promise<void>;
 }
@@ -14,7 +15,7 @@ const statusLabels = {
   rejected: 'Rechazada'
 } as const;
 
-const Requests: React.FC<RequestsProps> = ({ requests, currentUser, onReview }) => {
+const Requests: React.FC<RequestsProps> = ({ requests, items, currentUser, onReview }) => {
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [locations, setLocations] = useState<Record<string, string>>({});
@@ -44,9 +45,13 @@ const Requests: React.FC<RequestsProps> = ({ requests, currentUser, onReview }) 
     [requests]
   );
 
+  const isRestock = (id: string) => !!requests.find(r => r.id === id)?.targetItemId;
+  const targetItem = (request: InventoryRequest) =>
+    request.targetItemId ? items.find(i => i.id === request.targetItemId) : undefined;
+
   const review = async (id: string, decision: 'approved' | 'rejected') => {
     const location = locations[id]?.trim();
-    if (decision === 'approved' && !location) {
+    if (decision === 'approved' && !location && !isRestock(id)) {
       setError('Indica la ubicación en el almacén antes de aprobar la entrada.');
       return;
     }
@@ -86,15 +91,15 @@ const Requests: React.FC<RequestsProps> = ({ requests, currentUser, onReview }) 
             <div className="p-5 md:p-6">
               <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
                 <div className="flex gap-4 min-w-0">
-                  {request.imageUrl ? (
+                  {(request.imageUrl || targetItem(request)?.imageUrl) ? (
                     <button
                       type="button"
-                      onClick={() => setSelectedImage({ url: request.imageUrl, alt: request.concept })}
+                      onClick={() => setSelectedImage({ url: request.imageUrl || targetItem(request)?.imageUrl || '', alt: request.concept })}
                       className="relative w-16 h-16 rounded-xl bg-slate-100 overflow-hidden shrink-0 group focus:outline-none focus:ring-2 focus:ring-blue-500"
                       title="Ampliar fotografía"
                       aria-label={`Ampliar fotografía de ${request.concept}`}
                     >
-                      <img src={request.imageUrl} alt={request.concept} className="w-full h-full object-cover transition-transform group-hover:scale-105" />
+                      <img src={request.imageUrl || targetItem(request)?.imageUrl} alt={request.concept} className="w-full h-full object-cover transition-transform group-hover:scale-105" />
                       <span className="absolute inset-0 bg-black/0 group-hover:bg-black/35 transition-colors flex items-center justify-center">
                         <Maximize2 className="text-white opacity-0 group-hover:opacity-100 transition-opacity" size={20} />
                       </span>
@@ -106,9 +111,18 @@ const Requests: React.FC<RequestsProps> = ({ requests, currentUser, onReview }) 
                   )}
                   <div className="min-w-0">
                     <h3 className="font-bold text-slate-800 text-lg">{request.concept}</h3>
+                    <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ${request.targetItemId ? 'bg-blue-100 text-blue-700' : 'bg-violet-100 text-violet-700'}`}>
+                      {request.targetItemId ? 'Material existente · sumar unidades' : 'Material nuevo'}
+                    </span>
                     <p className="text-sm text-slate-500 mt-1">{request.description}</p>
                     <div className="flex flex-wrap gap-x-4 gap-y-2 mt-3 text-xs text-slate-500">
-                      <span className="flex items-center gap-1"><Package size={14} /> {request.quantity} uds.</span>
+                      <span className="flex items-center gap-1"><Package size={14} /> {request.targetItemId ? '+' : ''}{request.quantity} uds.</span>
+                      {request.targetItemId && request.status === 'pending' && targetItem(request) && (
+                        <span>Stock actual: {targetItem(request)!.quantity} → {targetItem(request)!.quantity + request.quantity} uds.</span>
+                      )}
+                      {request.targetItemId && !targetItem(request) && request.status === 'pending' && (
+                        <span className="text-rose-600">El material ya no existe en el inventario</span>
+                      )}
                       <span className="flex items-center gap-1"><MapPin size={14} /> {request.obra}</span>
                       {request.location && <span>Ubicación: {request.location}</span>}
                       {request.category && <span>Categoría: {request.category}</span>}
@@ -140,11 +154,13 @@ const Requests: React.FC<RequestsProps> = ({ requests, currentUser, onReview }) 
 
                 {canReview && request.status === 'pending' && (
                   <div className="w-full sm:w-auto flex flex-col gap-2">
-                    <label className="text-xs font-semibold text-slate-600">Ubicación en el almacén</label>
+                    <label className="text-xs font-semibold text-slate-600">
+                      Ubicación en el almacén{request.targetItemId ? ' (opcional, solo si cambia)' : ''}
+                    </label>
                     <input
                       type="text"
-                      required
-                      value={locations[request.id] ?? ''}
+                      required={!request.targetItemId}
+                      value={locations[request.id] ?? (request.targetItemId ? (targetItem(request)?.location ?? '') : '')}
                       onChange={event => setLocations(prev => ({ ...prev, [request.id]: event.target.value }))}
                       placeholder="Ej. Estantería A3, Pasillo 2"
                       className="w-full sm:w-72 px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
@@ -160,7 +176,7 @@ const Requests: React.FC<RequestsProps> = ({ requests, currentUser, onReview }) 
                       </button>
                       <button
                         type="button"
-                        disabled={processingId === request.id || !(locations[request.id]?.trim())}
+                        disabled={processingId === request.id || (!request.targetItemId && !(locations[request.id]?.trim()))}
                         onClick={() => review(request.id, 'approved')}
                         className="px-4 py-2 rounded-xl bg-emerald-600 text-white font-semibold text-sm hover:bg-emerald-700 disabled:opacity-50"
                       >

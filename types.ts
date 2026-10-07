@@ -42,6 +42,7 @@ export interface InventoryRequest {
   reviewedByName?: string;
   reviewedAt?: number;
   createdItemId?: string;
+  targetItemId?: string; // Si existe, la solicitud suma unidades a este material
 }
 
 export interface StockItem {

@@ -98,7 +98,8 @@ const App: React.FC = () => {
         status: row.status as InventoryRequest['status'],
         reviewedByName: (row.reviewed_by_name as string) || undefined,
         reviewedAt: row.reviewed_at ? Number(row.reviewed_at) : undefined,
-        createdItemId: (row.created_item_id as string) || undefined
+        createdItemId: (row.created_item_id as string) || undefined,
+        targetItemId: (row.target_item_id as string) || undefined
       })));
     }
   };
@@ -315,6 +316,61 @@ const App: React.FC = () => {
     }
 
     setItems(prev => prev.map(i => (i.id === itemId ? { ...i, quantity: newQuantity, updatedAt: now } : i)));
+    return true;
+  };
+
+  const requestRestock = async (itemId: string, amountRaw: number, obraProcedencia: string, extraNote: string) => {
+    if (!currentUser || currentUser.role !== 'Axis') return false;
+    const item = items.find(i => i.id === itemId);
+    if (!item) return false;
+    const quantity = Math.floor(amountRaw);
+    if (!Number.isFinite(quantity) || quantity < 1) return false;
+
+    const now = Date.now();
+    const obra = obraProcedencia.trim() || item.obra;
+    const description = extraNote.trim()
+      ? `${item.description} — Nota AXIS: ${extraNote.trim()}`
+      : item.description;
+
+    const { data, error } = await supabase.from('inventory_requests').insert({
+      id: crypto.randomUUID(),
+      concept: item.concept,
+      description,
+      obra,
+      quantity,
+      is_recurrent: false,
+      min_stock: null,
+      location: '',
+      image_url: '',
+      category: item.category ?? '',
+      requested_by: currentUser.id,
+      requested_by_name: currentUser.name,
+      requested_at: now,
+      status: 'pending',
+      target_item_id: item.id
+    }).select('*').single();
+
+    if (error) {
+      console.error('Error enviando solicitud de material existente:', error);
+      alert(`No se pudo enviar la solicitud: ${error.message}`);
+      return false;
+    }
+
+    setRequests(prev => [{
+      id: data.id,
+      concept: data.concept,
+      description: data.description,
+      obra: data.obra,
+      quantity: Number(data.quantity),
+      location: data.location || undefined,
+      imageUrl: data.image_url ?? '',
+      category: data.category || undefined,
+      requestedBy: data.requested_by,
+      requestedByName: data.requested_by_name,
+      requestedAt: Number(data.requested_at),
+      status: data.status,
+      targetItemId: data.target_item_id || undefined
+    }, ...prev]);
     return true;
   };
 
@@ -746,10 +802,10 @@ const App: React.FC = () => {
                 <MovementsHistory movements={movements} />
               } />
               <Route path="/add" element={
-                <AddItem items={items} onAdd={addItem} onRestock={restockItem} currentUser={currentUser} />
+                <AddItem items={items} onAdd={addItem} onRestock={currentUser.role === 'Axis' ? requestRestock : restockItem} currentUser={currentUser} />
               } />
               <Route path="/requests" element={
-                <Requests requests={requests} currentUser={currentUser} onReview={reviewRequest} />
+                <Requests requests={requests} items={items} currentUser={currentUser} onReview={reviewRequest} />
               } />
             </Routes>
           </div>
