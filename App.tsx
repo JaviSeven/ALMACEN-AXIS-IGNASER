@@ -256,6 +256,68 @@ const App: React.FC = () => {
     setMovements(prev => [movement, ...prev]);
   };
 
+  const restockItem = async (itemId: string, amountRaw: number, obraProcedencia: string, extraNote: string) => {
+    if (!currentUser || (currentUser.role !== 'Admin' && currentUser.role !== 'Operario')) return false;
+
+    const current = items.find(i => i.id === itemId);
+    if (!current) return false;
+
+    const amount = Math.floor(amountRaw);
+    if (!Number.isFinite(amount) || amount < 1) return false;
+
+    const newQuantity = current.quantity + amount;
+    const now = Date.now();
+    const procedencia = obraProcedencia.trim() || current.obra;
+
+    const { error: updateError } = await supabase
+      .from('items')
+      .update({ quantity: newQuantity, updated_at: now })
+      .eq('id', itemId);
+    if (updateError) {
+      console.error('Error actualizando material existente:', updateError);
+      alert(`No se pudo dar entrada al material: ${updateError.message}`);
+      return false;
+    }
+
+    const movement: Movement = {
+      id: crypto.randomUUID(),
+      itemId,
+      itemConcept: current.concept,
+      userId: currentUser.id,
+      userName: currentUser.name,
+      type: 'IN',
+      quantityChange: amount,
+      newQuantity,
+      timestamp: now,
+      note: `Entrada a material existente: +${amount} uds. Obra: ${procedencia}${extraNote.trim() ? `. ${extraNote.trim()}` : ''}`,
+      obraProcedencia: procedencia,
+      obraDestino: 'Almacén'
+    };
+
+    const { error: movError } = await supabase.from('movements').insert({
+      id: movement.id,
+      item_id: itemId,
+      item_concept: movement.itemConcept,
+      user_id: currentUser.id,
+      user_name: currentUser.name,
+      type: movement.type,
+      quantity_change: movement.quantityChange,
+      new_quantity: movement.newQuantity,
+      timestamp: movement.timestamp,
+      note: movement.note ?? null,
+      obra_procedencia: movement.obraProcedencia ?? null,
+      obra_destino: movement.obraDestino ?? null
+    });
+    if (movError) {
+      console.error('Error registrando entrada en historial:', movError);
+    } else {
+      setMovements(prev => [movement, ...prev]);
+    }
+
+    setItems(prev => prev.map(i => (i.id === itemId ? { ...i, quantity: newQuantity, updatedAt: now } : i)));
+    return true;
+  };
+
   const reviewRequest = async (requestId: string, decision: 'approved' | 'rejected', location?: string) => {
     if (!currentUser || (currentUser.role !== 'Admin' && currentUser.role !== 'Operario')) return;
     const { error } = await supabase.rpc('review_inventory_request_v2', {
@@ -677,7 +739,7 @@ const App: React.FC = () => {
                 <MovementsHistory movements={movements} />
               } />
               <Route path="/add" element={
-                <AddItem onAdd={addItem} currentUser={currentUser} />
+                <AddItem items={items} onAdd={addItem} onRestock={restockItem} currentUser={currentUser} />
               } />
               <Route path="/requests" element={
                 <Requests requests={requests} currentUser={currentUser} onReview={reviewRequest} />
